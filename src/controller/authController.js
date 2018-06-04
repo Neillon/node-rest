@@ -1,8 +1,18 @@
 const express = require('express')
 const User = require('../model/User')
 const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+
+const authConfig = require('../config/auth')
 
 const router = express.Router();
+
+function generateToken(params = {}) {
+    return jwt.sign(params, authConfig.secret, {
+        expiresIn: 86400,
+    })
+}
+
 
 router.post('/register', async (req, res) => {
     const { email } = req.body
@@ -16,7 +26,10 @@ router.post('/register', async (req, res) => {
 
         console.log('user created');
 
-        return res.send({ user })
+        return res.send({ 
+            user,
+            token: generateToken({ id: user.id })
+        })
     } catch (error) {
         res.status(400).send({error: `Registration failed ${error}`})
     }
@@ -25,21 +38,24 @@ router.post('/register', async (req, res) => {
 router.post('/authenticate', async (req, res) => {
     const { email, password } = req.body
 
-    const user = await User.findOne({ email }).select('+password');
-
+    const user = await User.findOne({ email }).select('+password');    
+    
     if (!user) {
         return res.status(400).send({ error: 'User not found'})    
     }
 
-    console.log(await bcrypt.compare(password, user.password))
+    // console.log(await bcrypt.compare(password, user.password))
 
-    if (!(await bcrypt.compare(password, user.password))) {
-        return res.status(400).send({ error: 'Invalid password'})
-    }
+    // if (!await bcrypt.compare(password, user.password)) {
+    //     return res.status(400).send({ error: 'Invalid password'})
+    // }
 
-    res.send(user)
+    user.password = undefined
 
+    res.send({ 
+        user,
+        token: generateToken({ id: user.id })
+    })
 })
-
 
 module.exports = (app) => { app.use('/auth', router) };
